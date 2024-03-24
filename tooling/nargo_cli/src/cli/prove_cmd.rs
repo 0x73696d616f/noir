@@ -6,7 +6,7 @@ use nargo::package::Package;
 use nargo::workspace::Workspace;
 use nargo::{insert_all_files_for_workspace_into_file_manager, parse_all};
 use nargo_toml::{get_package_manifest, resolve_workspace_from_toml, PackageSelection};
-use noirc_abi::input_parser::Format;
+use noirc_abi::{input_parser::{Format, InputValue}, InputMap};
 use noirc_driver::{
     file_manager_with_stdlib, CompileOptions, CompiledProgram, NOIR_ARTIFACT_VERSION_STRING,
 };
@@ -49,6 +49,12 @@ pub(crate) struct ProveCommand {
     /// JSON RPC url to solve oracle calls
     #[clap(long)]
     oracle_resolver: Option<String>,
+
+    #[clap(long, short)]
+    input: String,
+
+    #[arg(long)]
+    show_output: bool,
 }
 
 pub(crate) fn run(
@@ -102,6 +108,8 @@ pub(crate) fn run(
             &args.verifier_name,
             args.verify,
             args.oracle_resolver.as_deref(),
+            &args.input,
+            args.show_output
         )?;
     }
 
@@ -118,10 +126,17 @@ pub(crate) fn prove_package(
     verifier_name: &str,
     check_proof: bool,
     foreign_call_resolver_url: Option<&str>,
+    input: &str,
+    show_output: bool,
 ) -> Result<(), CliError> {
-    // Parse the initial witness values from Prover.toml
-    let (inputs_map, _) =
-        read_inputs_from_file(&package.root_dir, prover_name, Format::Toml, &compiled_program.abi)?;
+    let mut inputs_map;
+    if input.len() > 0 {
+        let format = Format::Toml;
+        inputs_map = format.parse(&input, &compiled_program.abi).unwrap();
+    } else {
+        (inputs_map, _) =
+            read_inputs_from_file(&package.root_dir, prover_name, Format::Toml, &compiled_program.abi)?;
+    }
 
     let solved_witness =
         execute_program(&compiled_program, &inputs_map, foreign_call_resolver_url)?;
@@ -140,6 +155,10 @@ pub(crate) fn prove_package(
     )?;
 
     let proof = backend.prove(&compiled_program.program, WitnessStack::from(solved_witness))?;
+
+    if show_output {
+        println!("0x{}", hex::encode(proof.clone()));
+    }
 
     if check_proof {
         let public_inputs = public_abi.encode(&public_inputs, return_value)?;
