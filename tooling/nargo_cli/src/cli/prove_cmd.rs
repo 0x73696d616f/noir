@@ -6,7 +6,7 @@ use nargo::package::Package;
 use nargo::workspace::Workspace;
 use nargo::{insert_all_files_for_workspace_into_file_manager, parse_all};
 use nargo_toml::{get_package_manifest, resolve_workspace_from_toml, PackageSelection};
-use noirc_abi::{input_parser::{Format, InputValue}, InputMap};
+use noirc_abi::{input_parser::Format};
 use noirc_driver::{
     file_manager_with_stdlib, CompileOptions, CompiledProgram, NOIR_ARTIFACT_VERSION_STRING,
 };
@@ -129,7 +129,7 @@ pub(crate) fn prove_package(
     input: &str,
     show_output: bool,
 ) -> Result<(), CliError> {
-    let mut inputs_map;
+    let inputs_map;
     if input.len() > 0 {
         let format = Format::Toml;
         inputs_map = format.parse(&input, &compiled_program.abi).unwrap();
